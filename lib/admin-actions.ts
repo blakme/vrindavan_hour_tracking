@@ -200,3 +200,54 @@ export async function adminUpdatePassword(userId: string, password: string): Pro
   if (json.error) return { success: false, error: json.error };
   return { success: true };
 }
+
+export async function adminCreateUser(params: {
+  email: string;
+  password: string;
+  name: string;
+  role?: string;
+  volunteer_type?: string | null;
+  status?: string;
+}): Promise<ActionResult> {
+  const profile = await getCurrentProfile();
+  if (!profile) return { success: false, error: 'Not authenticated' };
+  if (profile.role !== 'ADMIN') return { success: false, error: 'Only admins can create users.' };
+
+  if (params.password.length < 6) {
+    return { success: false, error: 'Password must be at least 6 characters.' };
+  }
+  if (!params.email.trim() || !params.name.trim()) {
+    return { success: false, error: 'Name and email are required.' };
+  }
+
+  const { data: session } = await supabase.auth.getSession();
+  if (!session.session?.access_token) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/admin-auth`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${session.session.access_token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      action: 'create_user',
+      email: params.email,
+      password: params.password,
+      name: params.name,
+      role: params.role || 'VOLUNTEER',
+      volunteer_type: params.volunteer_type || null,
+      status: params.status || 'ACTIVE',
+    }),
+  });
+
+  if (!response.ok) {
+    const json = await response.json().catch(() => ({ error: 'Request failed' }));
+    return { success: false, error: json.error || `Request failed (${response.status})` };
+  }
+  const json = await response.json().catch(() => ({}));
+  if (json.error) return { success: false, error: json.error };
+  return { success: true };
+}

@@ -10,10 +10,14 @@ const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 
 interface AdminAuthRequest {
-  action: "update_email" | "update_password";
-  user_id: string;
+  action: "update_email" | "update_password" | "create_user";
+  user_id?: string;
   email?: string;
   password?: string;
+  name?: string;
+  role?: string;
+  volunteer_type?: string;
+  status?: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -103,6 +107,59 @@ Deno.serve(async (req: Request) => {
           { password: body.password }
         );
         if (error) throw new Error(`Could not update password: ${error.message}`);
+        break;
+      }
+
+      case "create_user": {
+        if (!body.email || !body.password || !body.name) {
+          throw new Error("email, password, and name are required");
+        }
+        if (body.password.length < 6) {
+          throw new Error("Password must be at least 6 characters");
+        }
+
+        const email = body.email.trim().toLowerCase();
+
+        // 1. Create the auth user (no email confirmation, no invitation email).
+        const { data: newUser, error: createErr } = await admin.auth.admin.createUser({
+          email,
+          password: body.password,
+          email_confirm: true,
+          user_metadata: { name: body.name.trim() },
+        });
+        if (createErr) throw new Error(`Could not create user: ${createErr.message}`);
+        if (!newUser.user) throw new Error("Could not create user: no user returned");
+
+        // 2. Insert the profile row with admin-supplied fields. The email trigger
+        //    fills email from auth.users, so we don't pass it here.
+        const { error: profileErr } = await admin
+          .from("profiles")
+          .insert({
+            id: newUser.user.id,
+            name: body.name.trim(),
+            volunteer_type: body.volunteer_type || null,
+          });
+        if (profileErr) throw new Error(`Could not create profile: ${profileErr.message}`);
+
+        // 3. Set role and status via the existing admin RPC functions so all
+        //    validation and audit logic runs consistently.
+        if (body.role && body.role !== "VOLUNTEER") {
+          const { error: roleErr } = await admin.rpc("admin_set_user_role", {
+            p_user_id: newUser.user.id,
+            p_role: body.role,
+          });
+          if (roleErr) throw new Error(`Could not set role: ${roleErr.message}`);
+        }
+
+        const targetStatus = body.status || "ACTIVE";
+        if (targetStatus !== "PENDING_APPROVAL") {
+          const { error: statusErr } = await admin.rpc("admin_set_user_status", {
+            p_user_id: newUser.user.id,
+            p_status: targetStatus,
+          });
+          if (statusErr) throw new Error(`Could not set status: ${statusErr.message}`);
+        }
+
         break;
       }
 

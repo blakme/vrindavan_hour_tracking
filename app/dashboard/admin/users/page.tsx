@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { supabase, Profile, Category, UserCategoryAssignment, CategoryLeadAssignment, UserRole, UserStatus, VolunteerType } from '@/lib/supabase';
-import { promoteUser, setUserStatus, adminUpdateProfile, adminUpdateEmail, adminUpdatePassword } from '@/lib/admin-actions';
+import { promoteUser, setUserStatus, adminUpdateProfile, adminUpdateEmail, adminUpdatePassword, adminCreateUser } from '@/lib/admin-actions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,6 +34,7 @@ import {
   Trash2,
   FolderTree,
   ShieldCheck,
+  UserPlus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { roleLabel, volunteerTypeLabel, formatDate, userStatusLabel } from '@/lib/format';
@@ -77,6 +78,17 @@ export default function UsersPage() {
   const [managingLeadsFor, setManagingLeadsFor] = useState<UserWithAssignments | null>(null);
   const [userLeadAssignments, setUserLeadAssignments] = useState<CategoryLeadAssignment[]>([]);
   const [selectedLeadCategory, setSelectedLeadCategory] = useState('');
+
+  // Create user modal state
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: 'VOLUNTEER',
+    volunteer_type: '__none__',
+    status: 'ACTIVE',
+  });
 
   const loadCategories = useCallback(async () => {
     const { data } = await supabase
@@ -292,6 +304,27 @@ export default function UsersPage() {
     setUserLeadAssignments((prev) => prev.filter((a) => a.id !== assignmentId));
   }
 
+  async function handleCreateUser() {
+    setActionLoading(true);
+    const result = await adminCreateUser({
+      email: createForm.email.trim(),
+      password: createForm.password,
+      name: createForm.name.trim(),
+      role: createForm.role,
+      volunteer_type: createForm.volunteer_type === '__none__' ? null : createForm.volunteer_type,
+      status: createForm.status,
+    });
+    if (result.success) {
+      toast.success('User created successfully.');
+      setShowCreateModal(false);
+      setCreateForm({ name: '', email: '', password: '', role: 'VOLUNTEER', volunteer_type: '__none__', status: 'ACTIVE' });
+      loadUsers();
+    } else {
+      toast.error(result.error || 'Could not create user.');
+    }
+    setActionLoading(false);
+  }
+
   const hasActiveFilters = search.trim() || roleFilter !== 'ALL' || statusFilter !== 'ALL';
 
   function clearFilters() {
@@ -302,11 +335,17 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="font-display text-3xl font-semibold tracking-tight">User Management</h1>
-        <p className="mt-1 text-muted-foreground">
-          Create, edit, and deactivate users. Assign categories and category leads.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="font-display text-3xl font-semibold tracking-tight">User Management</h1>
+          <p className="mt-1 text-muted-foreground">
+            Create, edit, and deactivate users. Assign categories and category leads.
+          </p>
+        </div>
+        <Button onClick={() => setShowCreateModal(true)} disabled={actionLoading} className="shrink-0">
+          <UserPlus className="mr-2 h-4 w-4" />
+          Create user
+        </Button>
       </div>
 
       {/* Filters */}
@@ -719,6 +758,114 @@ export default function UsersPage() {
               </div>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create user modal */}
+      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create new user</DialogTitle>
+            <DialogDescription>
+              Create an account with a name, email, and default password. The user can log in immediately.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="create-name">Full name</Label>
+              <Input
+                id="create-name"
+                value={createForm.name}
+                onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="Krishna Das"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="create-email">Email</Label>
+              <Input
+                id="create-email"
+                type="email"
+                value={createForm.email}
+                onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))}
+                placeholder="you@example.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="create-password">Default password</Label>
+              <Input
+                id="create-password"
+                type="password"
+                value={createForm.password}
+                onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))}
+                placeholder="At least 6 characters"
+                autoComplete="new-password"
+              />
+              <p className="text-xs text-muted-foreground">
+                Share this password with the user. They can change it after logging in.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-role">Role</Label>
+                <Select
+                  value={createForm.role}
+                  onValueChange={(v) => setCreateForm((f) => ({ ...f, role: v }))}
+                >
+                  <SelectTrigger id="create-role">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="VOLUNTEER">Volunteer</SelectItem>
+                    <SelectItem value="GROUP_LEAD">Category Lead</SelectItem>
+                    <SelectItem value="ADMIN">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-status">Status</Label>
+                <Select
+                  value={createForm.status}
+                  onValueChange={(v) => setCreateForm((f) => ({ ...f, status: v }))}
+                >
+                  <SelectTrigger id="create-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ACTIVE">Active</SelectItem>
+                    <SelectItem value="PENDING_APPROVAL">Pending Approval</SelectItem>
+                    <SelectItem value="INACTIVE">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="create-vtype">Volunteer type</Label>
+              <Select
+                value={createForm.volunteer_type}
+                onValueChange={(v) => setCreateForm((f) => ({ ...f, volunteer_type: v }))}
+              >
+                <SelectTrigger id="create-vtype">
+                  <SelectValue placeholder="None" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+                  <SelectItem value="MIDDLE_SCHOOL">Middle School</SelectItem>
+                  <SelectItem value="HIGH_SCHOOL">High School</SelectItem>
+                  <SelectItem value="ADULT">Adult</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateModal(false)}>Cancel</Button>
+            <Button
+              onClick={handleCreateUser}
+              disabled={actionLoading || !createForm.name.trim() || !createForm.email.trim() || createForm.password.length < 6}
+            >
+              {actionLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Create user
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
