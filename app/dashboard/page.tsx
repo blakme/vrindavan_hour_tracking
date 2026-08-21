@@ -51,31 +51,30 @@ export default function DashboardHome() {
       const weekAgo = new Date();
       weekAgo.setDate(weekAgo.getDate() - 7);
 
-      const { data: entries } = await supabase
-        .from('hour_entries')
-        .select('id, date, hours, status, category:categories!hour_entries_category_id_fkey(name), sub_category:categories!hour_entries_sub_category_id_fkey(name)')
-        .eq('volunteer_id', profile.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
+      // Two parallel queries instead of four sequential ones:
+      // recent entries (for the list) + all entries (for totals).
+      const [recentRes, allRes, milestonesRes] = await Promise.all([
+        supabase
+          .from('hour_entries')
+          .select('id, date, hours, status, category:categories!hour_entries_category_id_fkey(name), sub_category:categories!hour_entries_sub_category_id_fkey(name)')
+          .eq('volunteer_id', profile.id)
+          .order('created_at', { ascending: false })
+          .limit(5),
+        supabase
+          .from('hour_entries')
+          .select('hours, status, date')
+          .eq('volunteer_id', profile.id),
+        supabase
+          .from('milestones')
+          .select('id, name, target_hours, period_start, period_end, scope')
+          .eq('scope', 'GLOBAL')
+          .order('period_end', { ascending: false })
+          .limit(1),
+      ]);
 
-      const all = (entries ?? []) as unknown as HourEntry[];
-      const approved = all
-        .filter((e) => e.status === 'APPROVED')
-        .reduce((s, e) => s + Number(e.hours), 0);
+      const all = (recentRes.data ?? []) as unknown as HourEntry[];
 
-      // Fetch full totals
-      const { count: pendingCount } = await supabase
-        .from('hour_entries')
-        .select('id', { count: 'exact', head: true })
-        .eq('volunteer_id', profile.id)
-        .eq('status', 'PENDING');
-
-      const { data: allMine } = await supabase
-        .from('hour_entries')
-        .select('hours, status, date')
-        .eq('volunteer_id', profile.id);
-
-      const mine = allMine ?? [];
+      const mine = (allRes.data ?? []) as { hours: number; status: string; date: string }[];
       const totalApproved = mine
         .filter((e) => e.status === 'APPROVED')
         .reduce((s, e) => s + Number(e.hours), 0);
@@ -87,14 +86,7 @@ export default function DashboardHome() {
         .filter((e) => e.status === 'APPROVED' && new Date(e.date) >= weekAgo)
         .reduce((s, e) => s + Number(e.hours), 0);
 
-      // Milestone progress — use first global milestone
-      const { data: milestones } = await supabase
-        .from('milestones')
-        .select('id, name, target_hours, period_start, period_end, scope')
-        .eq('scope', 'GLOBAL')
-        .order('period_end', { ascending: false })
-        .limit(1);
-      const ms = (milestones ?? [])[0] as Milestone | undefined;
+      const ms = ((milestonesRes.data ?? [])[0] as Milestone | undefined);
 
       // Calculate period-scoped approved hours for milestone
       let periodApproved = 0;
@@ -138,6 +130,12 @@ export default function DashboardHome() {
         .eq('status', 'PENDING')
         .order('created_at', { ascending: false })
         .limit(10);
+
+      // Group leads cannot review their own hours, so exclude them from the
+      // dashboard preview list too.
+      if (profile.role === 'GROUP_LEAD') {
+        query = query.neq('volunteer_id', profile.id);
+      }
 
       const { data, error } = await query;
       if (error) {

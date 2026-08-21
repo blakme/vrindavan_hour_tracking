@@ -50,13 +50,19 @@ export default function ApprovalsPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const loadCategories = useCallback(async () => {
-    const { data } = await supabase
+    // Only admins can filter by category, so skip this query for group leads.
+    if (profile?.role !== 'ADMIN') return;
+    const { data, error } = await supabase
       .from('categories')
       .select('*')
       .is('parent_id', null)
       .order('order, name');
-    setParentCategories(data as Category[] | []);
-  }, []);
+    if (error) {
+      console.error('loadCategories failed', error);
+      return;
+    }
+    setParentCategories((data as Category[] | null) ?? []);
+  }, [profile?.role]);
 
   const loadEntries = useCallback(async () => {
     if (!profile) return;
@@ -88,13 +94,19 @@ export default function ApprovalsPage() {
         return;
       }
       query = query.in('category_id', ledCategoryIds);
+      // A group lead cannot review their own hours, so hide their own entries
+      // from the approval list to prevent a confusing dead-end approve attempt.
+      if (tab === 'PENDING') {
+        query = query.neq('volunteer_id', profile.id);
+      }
     }
 
     const { data, error } = await query;
     if (error) {
       toast.error('Could not load entries.');
+      setEntries([]);
     } else {
-      setEntries(data as unknown as HourEntry[]);
+      setEntries((data as unknown as HourEntry[]) ?? []);
     }
     setLoading(false);
   }, [profile, tab, categoryFilter]);

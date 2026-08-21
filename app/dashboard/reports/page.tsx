@@ -54,7 +54,7 @@ export default function ReportsPage() {
   const loadReferenceData = useCallback(async () => {
     const [catsRes, profilesRes] = await Promise.all([
       supabase.from('categories').select('*').is('parent_id', null).order('order, name'),
-      supabase.from('profiles').select('*').order('name'),
+      supabase.from('profiles').select('id, name, email, role, volunteer_type, status').order('name'),
     ]);
     setParentCategories((catsRes.data as Category[] | null) ?? []);
     setVolunteers((profilesRes.data as Profile[] | null) ?? []);

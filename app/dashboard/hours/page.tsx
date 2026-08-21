@@ -97,12 +97,17 @@ export default function MyHoursPage() {
         .eq('user_id', profile.id);
       setAssignedCategoryIds(new Set((assignments ?? []).map((a: { category_id: string }) => a.category_id)));
     } else {
-      const { data: volData } = await supabase
+      const { data: volData, error: volErr } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, name, email, role, status, volunteer_type')
         .eq('status', 'ACTIVE')
         .order('name');
-      setVolunteers((volData as Profile[] | null) ?? []);
+      if (volErr) {
+        console.error('load volunteers failed', volErr);
+        setVolunteers([]);
+      } else {
+        setVolunteers((volData as Profile[] | null) ?? []);
+      }
     }
   }, [profile]);
 
@@ -140,8 +145,9 @@ export default function MyHoursPage() {
     const { data, error } = await query;
     if (error) {
       toast.error('Could not load your hours.');
+      setEntries([]);
     } else {
-      setEntries(data as unknown as HourEntry[]);
+      setEntries((data as unknown as HourEntry[]) ?? []);
     }
     setLoading(false);
   }, [profile, filters, isAdmin]);
@@ -301,6 +307,9 @@ export default function MyHoursPage() {
   const isPendingApproval = profile?.status === 'PENDING_APPROVAL';
 
   const canLogHours = isAdmin || isApproved;
+
+  // O(1) volunteer name lookup instead of O(n) .find() in every render row.
+  const volunteerNameById = new Map(volunteers.map((v) => [v.id, v.name]));
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -510,7 +519,7 @@ export default function MyHoursPage() {
                     </p>
                     {isAdmin && (
                       <p className="mt-0.5 text-xs font-medium text-foreground/70">
-                        {volunteers.find((v) => v.id === e.volunteer_id)?.name ?? '—'}
+                        {volunteerNameById.get(e.volunteer_id) ?? '—'}
                       </p>
                     )}
                     {e.reflection && (
