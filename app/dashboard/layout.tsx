@@ -17,6 +17,7 @@ import {
   Menu,
   X,
   Hourglass,
+  UserCircle,
 } from 'lucide-react';
 import { useState, useEffect, ReactNode } from 'react';
 import { roleLabel, volunteerTypeLabel } from '@/lib/format';
@@ -60,6 +61,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     { href: '/dashboard/admin/reference', label: 'Reference Data', icon: Settings, roles: ['ADMIN'] },
     { href: '/dashboard/admin/milestones', label: 'Milestones', icon: Settings, roles: ['ADMIN'] },
     { href: '/dashboard/reports', label: 'Reports', icon: FileBarChart, roles: ['ADMIN'] },
+    { href: '/dashboard/profile', label: 'My Profile', icon: UserCircle, roles: ['VOLUNTEER', 'GROUP_LEAD', 'ADMIN'] },
   ].filter((item) => item.roles.includes(role));
 
   async function handleSignOut() {
