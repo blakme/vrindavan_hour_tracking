@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 33% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 22 76% 42%;
+    --primary-foreground: 40 33% 98%;
+    --secondary: 38 60% 95%;
+    --secondary-foreground: 28 60% 30%;
+    --muted: 38 30% 95%;
+    --muted-foreground: 222 15% 45%;
+    --accent: 38 80% 90%;
+    --accent-foreground: 28 60% 30%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 40 33% 98%;
+    --success: 142 71% 38%;
+    --success-foreground: 40 33% 98%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 28 60% 20%;
+    --border: 38 25% 88%;
+    --input: 38 25% 88%;
+    --ring: 22 76% 42%;
+    --radius: 0.625rem;
+    --chart-1: 22 76% 52%;
+    --chart-2: 142 60% 40%;
+    --chart-3: 217 70% 52%;
+    --chart-4: 38 92% 55%;
+    --chart-5: 280 55% 60%;
+  }
+  .dark {
+    --background: 222 47% 8%;
+    --foreground: 40 33% 96%;
+    --card: 222 40% 12%;
+    --card-foreground: 40 33% 96%;
+    --popover: 222 40% 12%;
+    --popover-foreground: 40 33% 96%;
+    --primary: 28 80% 55%;
+    --primary-foreground: 222 47% 11%;
+    --secondary: 222 30% 18%;
+    --secondary-foreground: 40 33% 90%;
+    --muted: 222 30% 18%;
+    --muted-foreground: 222 15% 65%;
+    --accent: 28 50% 22%;
+    --accent-foreground: 38 80% 85%;
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 40 33% 98%;
+    --success: 142 60% 42%;
+    --success-foreground: 40 33% 98%;
+    --warning: 38 90% 55%;
+    --warning-foreground: 222 47% 11%;
+    --border: 222 25% 22%;
+    --input: 222 25% 22%;
+    --ring: 28 80% 55%;
+    --chart-1: 28 80% 60%;
+    --chart-2: 142 60% 45%;
+    --chart-3: 217 70% 60%;
+    --chart-4: 38 90% 60%;
+    --chart-5: 280 55% 65%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  .bg-grain {
+    background-image: radial-gradient(circle at 1px 1px, hsl(var(--foreground) / 0.04) 1px, transparent 0);
+    background-size: 24px 24px;
+  }
+  .animate-fade-in {
+    animation: fadeIn 0.4s ease-out both;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out both;
+  }
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.97); }
+    to { opacity: 1; transform: scale(1); }
+  }
+}
